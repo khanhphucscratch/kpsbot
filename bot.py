@@ -27,31 +27,79 @@ async def say_hello(interaction: discord.Interaction, name: str):
 
 
 #Account manager
+import time
+import codeforces
+codeforces_verifying_account = {}
 @bot.tree.command(
     name="add_handle",
     description="Add a Codeforces handle"
 )
 async def add_handle(interaction: discord.Interaction, handle: str):
+    await interaction.response.defer()
     user = interaction.user
     user_id = interaction.user.id
     if user_id not in codeforces_account:
         codeforces_account[user_id] = set()
     if len(codeforces_account[user_id]) >= 3:
-        await interaction.response.send_message("No more than 3 accounts for each user")
+        await interaction.followup.send("No more than 3 accounts for each user")
         return
+    if handle in codeforces_account[user_id]:
+        await interaction.followup.send("Registered handle")
+        return
+    if codeforces_verifying_account.get(user_id) is not None:
+        ltime = codeforces_verifying_account[user_id][1]
+        if time.time() > ltime + 300:
+            codeforces_verifying_account.pop(user_id, None)
+            await interaction.followup.send("Verification expired. Try again.")
+            return
+        await interaction.followup.send("Be careful. You are verifying another account. This with nullify that process")
+    codeforces_verifying_account[user_id] = (handle, time.time())
+    msg = f"{handle}, you have 5 minutes to submit a compile error to this problem: https://codeforces.com/problemset/problem/4/A"
+    await interaction.followup.send(msg)
+
+@bot.tree.command(
+    name="verify_handle",
+    description="Verify a Codeforces handle"
+)
+async def verify_handle(interaction: discord.Interaction):
+    await interaction.response.defer()
+
+    user = interaction.user
+    user_id = interaction.user.id
+    if codeforces_verifying_account.get(user_id) is None:
+        await interaction.followup.send("You are verifying no handle. Use /add_handle first")
+        return
+    handle, ltime = codeforces_verifying_account[user_id]
+    result = await codeforces.verifying_account(handle, ltime, ltime + 300)
+    if result == False:
+        await interaction.followup.send("Find no submission to verify " + handle)
+        return
+
+    if user_id not in codeforces_account:
+        codeforces_account[user_id] = set()
     codeforces_account[user_id].add(handle)
-    await interaction.response.send_message("Added handle " + handle + " to user " + str(user))
+    codeforces_verifying_account[user_id] = None
+
+    info_data = await codeforces.get_user_info(handle)
+    rating = info_data["result"][0].get("rating", "Unrated")
+    msg = "Sucessfully added handle " + handle + " to " + str(user) + "\nRating: " + str(rating)
+    await interaction.followup.send(msg)
 
 
 @bot.tree.command(
-    name="clear_handle",
-    description="Clear all current handle"
+    name="delete_handle",
+    description="Delete current handle"
 )
-async def clear_handle(interaction: discord.Interaction):
+async def clear_handle(interaction: discord.Interaction, handle: str):
     user = interaction.user
     user_id = interaction.user.id
-    if user_id in codeforces_account:
-        codeforces_account[user_id].clear()
+    if user_id not in codeforces_account:
+        await interaction.response.send_message("Find no such registered handle")
+        return
+    if handle not in codeforces_account[user_id]:
+        await interaction.response.send_message("Find no such registered handle")
+        return
+    codeforces_account[user_id].remove(handle)
     await interaction.response.send_message("Clear handle for user " + str(user))
 
 
@@ -79,7 +127,6 @@ class Problem:
     problem: Any
 
 
-import codeforces
 current_training_status = {}
 
 @bot.tree.command(

@@ -18,6 +18,7 @@ class CodeforcesProblem:
 
 import aiohttp
 import asyncio
+import time
 
 async def get_user_info(handle):
     url = "https://codeforces.com/api/user.info"
@@ -29,8 +30,33 @@ async def get_user_info(handle):
     async with aiohttp.ClientSession() as session:
         async with session.get(url, params = params) as response:
             data = await response.json()
-
+    await asyncio.sleep(2)
     return data
+
+async def verifying_account(handle, time_left, time_right):
+    url = "https://codeforces.com/api/user.status"
+    params = {
+        "handle": handle,
+        "from": 1,
+        "count": 10
+    }
+
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, params = params) as response:
+            data = await response.json()
+    await asyncio.sleep(2)
+    if data["status"] != "OK":
+        return False
+    for status in data["result"]:
+        problem = status.get("problem", {})
+
+        if (status.get("verdict") == "COMPILATION_ERROR"
+            and problem.get("contestId") == 4
+            and problem.get("index") == "A"
+            and time_left <= status.get("creationTimeSeconds", 0) <= time_right):
+            return True
+
+    return False
 
 import json
 async def get_accepted_problem_from_user(handle):
