@@ -19,6 +19,7 @@ class CodeforcesProblem:
 import aiohttp
 import asyncio
 import time
+api_lock = asyncio.Lock()
 
 async def get_user_info(handle):
     url = "https://codeforces.com/api/user.info"
@@ -26,11 +27,14 @@ async def get_user_info(handle):
     params = {
         "handles": handle
     }
+    async with api_lock:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params = params) as response:
+                data = await response.json()
+        await asyncio.sleep(2)
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, params = params) as response:
-            data = await response.json()
-    await asyncio.sleep(2)
+    if data["status"] != "OK":
+        raise RuntimeError(data.get("comment", "Codeforces API failed"))
     return data
 
 async def verifying_account(handle, time_left, time_right):
@@ -40,11 +44,11 @@ async def verifying_account(handle, time_left, time_right):
         "from": 1,
         "count": 10
     }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, params = params) as response:
-            data = await response.json()
-    await asyncio.sleep(2)
+    async with api_lock:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params = params) as response:
+                data = await response.json()
+        await asyncio.sleep(2)
     if data["status"] != "OK":
         return False
     for status in data["result"]:
@@ -65,28 +69,51 @@ async def get_accepted_problem_from_user(handle):
         "handle": handle
     }
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, params = params) as response:
-            data = await response.json()
+    async with api_lock:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, params = params) as response:
+                data = await response.json()
+        await asyncio.sleep(2)
+    if data["status"] != "OK":
+        raise RuntimeError(data.get("comment", "Codeforces API failed"))
     problem_list = set() #Contain (contestid, problemid)
     for status in data["result"]:
-        if status["verdict"] != "OK":
+        if status.get("verdict") != "OK":
             continue
-        problem_list.add((status["problem"]["contestId"], status["problem"]["index"]))
 
-    await asyncio.sleep(2)
+        problem = status.get("problem", {})
+
+        if "contestId" not in problem or "index" not in problem:
+            continue
+
+        problem_list.add((
+            problem["contestId"],
+            problem["index"]
+        ))
+
     return problem_list
 
 
+data_caches = {}
+last_updated_time = -1
 async def get_all_problems(min_rating, max_rating, non_rating = False):
-    url = "https://codeforces.com/api/problemset.problems"
-    params = {}
+    global data_caches, last_updated_time
+    if time.time() <= last_updated_time + 1800:
+        data = data_caches
+    else:
+        async with api_lock:
+            url = "https://codeforces.com/api/problemset.problems"
+            params = {}
 
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, params = params) as response:
-            data = await response.json()
-
-    await asyncio.sleep(2)
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params = params) as response:
+                    data = await response.json()
+                    if data["status"] != "OK":
+                        raise RuntimeError("Codeforces API failed")
+                    data_caches = data
+            
+            last_updated_time = time.time()
+            await asyncio.sleep(2)
 
     problem_list = [] #Contain (contestid, problemid)
     for problem in data["result"]["problems"]:
@@ -103,7 +130,7 @@ async def get_all_problems(min_rating, max_rating, non_rating = False):
             index = problem["index"],
             name = problem["name"],
             rating = rating,
-            tags = problem["tags"]
+            tags=tuple(problem["tags"])
         ))
     return problem_list
 
