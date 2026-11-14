@@ -181,7 +181,7 @@ class Problem:
     name = "train_getproblem",
     description="Recommend a problem"
 )
-async def train_getproblem(interaction: discord.Interaction, min_rating: int, max_rating: int, hide_rating: bool):
+async def train_getproblem(interaction: discord.Interaction, min_rating: int, max_rating: int, hide_rating: bool, minimum_id: int = 0):
     await interaction.response.defer()
     user_id = interaction.user.id
     if current_training_status.get(user_id) is not None:
@@ -189,7 +189,7 @@ async def train_getproblem(interaction: discord.Interaction, min_rating: int, ma
         return
     
     handle_list = codeforces_account[user_id]
-    recommended_problem = await codeforces.recommend_problems_for_user(handle_list, min_rating = min_rating, max_rating = max_rating)
+    recommended_problem = await codeforces.recommend_problems_for_user(handle_list, min_rating = min_rating, max_rating = max_rating, minimum_id = minimum_id)
     if len(recommended_problem) == 0:
         await interaction.followup.send("Found no problem")
         return
@@ -241,4 +241,18 @@ async def train_completed(interaction: discord.Interaction):
         await interaction.followup.send("Found no Accepted submission. Continue your training!")
     return
 
+@bot.tree.command(
+    name = "current_problem",
+    description="Your current problem"
+)
+async def current_problem(interaction: discord.Interaction):
+    user = interaction.user
+    user_id = interaction.user.id
+    if current_training_status.get(user_id) is None:
+        await interaction.response.send_message("You are not currently solving a problem")
+        return
+
+    problem = current_training_status.get(user_id)
+    await interaction.response.send_message("User " + str(user) + " is solving problem " + problem.problem.url)
+    return
 bot.run(TOKEN)

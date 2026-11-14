@@ -135,7 +135,7 @@ async def get_all_problems(min_rating, max_rating, non_rating = False):
     return problem_list
 
 import random
-async def recommend_problems_for_user(handle_list, min_rating, max_rating, num_problem = 1):
+async def recommend_problems_for_user(handle_list, min_rating, max_rating, minimum_id, num_problem = 1):
     #Return a list of CodeforcesProblem type struct
     all_problems = await get_all_problems(min_rating=min_rating, max_rating = max_rating)
     #Fetch all solved problems
@@ -148,6 +148,7 @@ async def recommend_problems_for_user(handle_list, min_rating, max_rating, num_p
     all_unsolved_problems = [
         p for p in all_problems
         if (p.contestId, p.index) not in solved_problems
+        and p.contestId >= minimum_id
     ]
     if len(all_unsolved_problems) < num_problem:
         return all_unsolved_problems
