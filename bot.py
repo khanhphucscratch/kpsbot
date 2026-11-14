@@ -104,7 +104,7 @@ async def add_handle(interaction: discord.Interaction, handle: str):
         return
     codeforces_verifying_account[user_id] = (handle, time.time())
     existed_account.add(handle)
-    msg = f"{handle}, you have 5 minutes to submit a compile error to this problem: https://codeforces.com/problemset/problem/4/A"
+    msg = f"{handle}, you have 5 minutes to submit a compile error to this problem: https://codeforces.com/problemset/problem/4/A \nAfter that, use /handle_verify to complete verifying your handle"
     await interaction.followup.send(msg)
 
 @bot.tree.command(
