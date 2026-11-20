@@ -1,4 +1,4 @@
-Dev note (current version: v2.0)
+Dev note (current version: v2.1)
 
 v1.0
 Basically a bot that I decided to develop in my free time
@@ -50,3 +50,5 @@ Edited features:
 /train_complete: Because of technical issue (or because I'm just noob at this), I cannot get access to Atcoder API, so I did something pretty weird: If you solved that problem, just call train_complete, we will trust you, and we won't give you that problem again
 /backup: Now I also back up atcoder solved problems list for each user
 /load_backup: Will load the backup automatically, I updated this to deal with new /backup features
+
+v2.1: Just organize backup data neatly inside a subfolder

@@ -118,7 +118,7 @@ async def show_handle_list(interaction: discord.Interaction):
     user = interaction.user
     user_id = interaction.user.id
     if user_id not in codeforces_account:
-        codeforces_account[user_id] = set()
+        codeforces_account[user_id] = []
 
     msg = ""
     for handle in codeforces_account[user_id]:
@@ -268,6 +268,8 @@ async def atcoder_train_getproblem(interaction: discord.Interaction, min_rating:
     return
 
 #__________________________Data backup_______________________________________
+
+import os 
 @bot.tree.command(
     name="backup",
     description="Backup the data. Admin only"
@@ -279,13 +281,15 @@ async def backup(interaction: discord.Interaction):
                 ephemeral=True
             )
             return
-    with open("backup_data.json", "w") as f:
+    
+    os.makedirs("backup_data", exist_ok=True)
+    with open(os.path.join("backup_data", "user_handle_list_codeforces.json"), "w") as f:
         json.dump(
             {user_id: list(handles) for user_id, handles in codeforces_account.items()},
             f,
             indent=4
         )
-    with open("solved_problem_atcoder.json", "w") as f:
+    with open(os.path.join("backup_data", "solved_problem_atcoder.json"), "w") as f:
         json.dump(
             {user_id: list(problemId) for user_id, problemId in atcoder_solved_problem.items()},
             f,
@@ -305,13 +309,13 @@ async def load_backup(interaction: discord.Interaction):
             ephemeral=True
         )
         return
-    with open("backup_data.json", "r") as f:
+    with open(os.path.join("backup_data", "user_handle_list_codeforces.json"), "r") as f:
         raw_data = json.load(f)
     codeforces_account = {
         int(user_id): list(handles)
         for user_id, handles in raw_data.items()
     }
-    with open("solved_problem_atcoder.json", "r") as f:
+    with open(os.path.join("backup_data", "solved_problem_atcoder.json"), "r") as f:
         raw_data = json.load(f)
     atcoder_solved_problem = {
         int(user_id): list(problemId)
