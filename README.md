@@ -1,11 +1,14 @@
+Dev note (current version: v2.0)
+
+v1.0
 Basically a bot that I decided to develop in my free time
 
 It's made just for randomize Codeforces problem
 
 New features (that I haven't see in any other bot):
  - can include many Codeforces handle for each users (useful for someone with many alt accounts like me hehe)
+ - You could hide current problem rating (I do need this feature a lot)
  - You could say Hello to anyone! (I coded that just to test if my bot can connect with Discord properly, because I'm new to this. But I decided to keep that anyway)
-
 Sus thing:
  - I made this in a single morning, with no background knowledge, so I didn't have time to
  learn fancy thing such as LiteSQL. So if I refresh my bot, all the data will be lost immediately
@@ -35,3 +38,15 @@ Basic features
 /train_complete: After you got Accepted, use this, it will verify for you
 
 /current_problem: Get the problem that you are currently solving
+
+
+v2.0: I integrated my bot with Atcoder! (another evening wasted)
+New features:
+/atcoder_train_getproblem: Get an atcoder problem
+
+Edited features:
+/current_problem: Now you could see your current problem, even with Atcoder!
+/train_giveup: Nothing changed, you could use it even with Atcoder problem
+/train_complete: Because of technical issue (or because I'm just noob at this), I cannot get access to Atcoder API, so I did something pretty weird: If you solved that problem, just call train_complete, we will trust you, and we won't give you that problem again
+/backup: Now I also back up atcoder solved problems list for each user
+/load_backup: Will load the backup automatically, I updated this to deal with new /backup features
