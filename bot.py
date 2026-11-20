@@ -18,6 +18,7 @@ class MyBot(discord.Client):
 
 bot = MyBot()
 
+#____________________________________This part is for Codeforces________________________
 codeforces_account = {}
 codeforces_verifying_account = {}
 existed_account = set()
@@ -31,49 +32,6 @@ async def say_hello(interaction: discord.Interaction, name: str):
     await interaction.response.send_message("Hello " + name)
 
 import json
-@bot.tree.command(
-    name="backup",
-    description="Backup the data. Admin only"
-)
-async def backup(interaction: discord.Interaction):
-    if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "You don't have permission to use this command!",
-                ephemeral=True
-            )
-            return
-    with open("backup_data.json", "w") as f:
-        json.dump(
-            {user_id: list(handles) for user_id, handles in codeforces_account.items()},
-            f,
-            indent=4
-        )
-    await interaction.response.send_message("Backup finished")
-
-@bot.tree.command(
-    name="load_backup",
-    description="Load all backup data. Admin only"
-)
-async def load_backup(interaction: discord.Interaction):
-    global codeforces_account
-    if not interaction.user.guild_permissions.administrator:
-        await interaction.response.send_message(
-            "You don't have permission to use this command!",
-            ephemeral=True
-        )
-        return
-    with open("backup_data.json", "r") as f:
-        raw_data = json.load(f)
-    codeforces_account = {
-        int(user_id): set(handles)
-        for user_id, handles in raw_data.items()
-    }
-    existed_account.clear()
-    for id, handle_list in codeforces_account.items():
-        for handle in handle_list:
-            existed_account.add(handle)
-
-    await interaction.response.send_message("Loaded all the data")
 
 #Account manager
 import time
@@ -184,10 +142,13 @@ class Problem:
 async def train_getproblem(interaction: discord.Interaction, min_rating: int, max_rating: int, hide_rating: bool, minimum_id: int = 0):
     await interaction.response.defer()
     user_id = interaction.user.id
+    user = interaction.user
     if current_training_status.get(user_id) is not None:
         await interaction.followup.send("You are training on a problem. Keep training, or use train_giveup / train_completed")
         return
-    
+
+    if codeforces_account.get(user_id) is None:
+        codeforces_account[user_id] = []
     handle_list = codeforces_account[user_id]
     recommended_problem = await codeforces.recommend_problems_for_user(handle_list, min_rating = min_rating, max_rating = max_rating, minimum_id = minimum_id)
     if len(recommended_problem) == 0:
@@ -197,12 +158,14 @@ async def train_getproblem(interaction: discord.Interaction, min_rating: int, ma
     chosen_problem = recommended_problem[0]
     current_training_status[user_id] = Problem(oj = "codeforces", problem = chosen_problem)
 
-    await interaction.followup.send(f"Found a problem for you! \nProblem link: {chosen_problem.url}, rating = {chosen_problem.rating if hide_rating == False else '?'}")
+    await interaction.followup.send(f"{str(user)}, Found a problem for you! \nProblem link: {chosen_problem.url}, rating = {chosen_problem.rating if hide_rating == False else '?'}")
     return
 @bot.tree.command(
     name = "train_giveup",
     description="Giveup your current problem"
 )
+
+#This should also work with atcoder
 async def train_giveup(interaction: discord.Interaction):
     await interaction.response.defer()
     user_id = interaction.user.id
@@ -216,6 +179,8 @@ async def train_giveup(interaction: discord.Interaction):
     await interaction.followup.send(msg)
     return
 
+#This is modified to work with Atcoder problem
+atcoder_solved_problem = {}
 @bot.tree.command(
     name = "train_completed",
     description="Completed your current problem"
@@ -228,23 +193,34 @@ async def train_completed(interaction: discord.Interaction):
         await interaction.followup.send("Find no ongoing problem")
         return
 
-    problem = current_training_status[user_id].problem
-    problem_code = (problem.contestId, problem.index)
-    handle_list = codeforces_account[user_id]
+    if current_training_status[user_id].oj == "codeforces":
+        problem = current_training_status[user_id].problem
+        problem_code = (problem.contestId, problem.index)
+        handle_list = codeforces_account[user_id]
 
-    result = await codeforces.check_if_accepted(handle_list, problem_code)
-    if result == True:
+        result = await codeforces.check_if_accepted(handle_list, problem_code)
+        if result == True:
+            msg = f"{user} got Accepted on problem: {str(problem)} \nrating: {problem.rating}"
+            current_training_status[user_id] = None
+            await interaction.followup.send(msg)
+        else:
+            await interaction.followup.send("Found no Accepted submission. Continue your training!")
+        return
+    else:
+        problem = current_training_status[user_id].problem
+        if atcoder_solved_problem.get(user_id) is None:
+            atcoder_solved_problem[user_id] = []
+        atcoder_solved_problem[user_id].append(problem.problemId)
         msg = f"{user} got Accepted on problem: {str(problem)} \nrating: {problem.rating}"
         current_training_status[user_id] = None
         await interaction.followup.send(msg)
-    else:
-        await interaction.followup.send("Found no Accepted submission. Continue your training!")
-    return
 
 @bot.tree.command(
     name = "current_problem",
     description="Your current problem"
 )
+
+#This also work with atcoder
 async def current_problem(interaction: discord.Interaction):
     user = interaction.user
     user_id = interaction.user.id
@@ -255,4 +231,98 @@ async def current_problem(interaction: discord.Interaction):
     problem = current_training_status.get(user_id)
     await interaction.response.send_message("User " + str(user) + " is solving problem " + problem.problem.url)
     return
+
+
+
+
+#___________________________This part is for Atcoder____________________________________
+import atcoder
+import re
+
+@bot.tree.command(
+    name="atcoder_train_getproblem",
+    description="Recommend an Atcoder problem"
+)
+async def atcoder_train_getproblem(interaction: discord.Interaction, min_rating: int, max_rating: int, hide_rating: bool, exclude: str = "smth"):
+    await interaction.response.defer()
+    user_id = interaction.user.id
+    user = interaction.user
+    if current_training_status.get(user_id) is not None:
+        await interaction.followup.send("You are training on a problem. Keep training, or use train_giveup / train_completed")
+        return
+
+    exclude_type = re.split(r"[,\s]+", exclude)
+    print(exclude_type)
+    if atcoder_solved_problem.get(user_id) is None:
+        atcoder_solved_problem[user_id] = []
+
+    solved_problem = atcoder_solved_problem[user_id]
+    problems = await atcoder.recommend_problems_for_user(min_rating = min_rating, max_rating = max_rating, exclude_type = exclude_type, solved_problem = solved_problem)
+    if len(problems) == 0:
+        await interaction.followup.send("Found no problem for user " + str(user))
+        return
+
+    chosen_problem = problems[0]
+    current_training_status[user_id] = Problem(oj = "atcoder", problem = chosen_problem)
+    await interaction.followup.send(f"{str(user)}, found a problem for you! \nProblem link: {chosen_problem.url}, rating = {chosen_problem.rating if hide_rating == False else '?'}")
+    return
+
+#__________________________Data backup_______________________________________
+@bot.tree.command(
+    name="backup",
+    description="Backup the data. Admin only"
+)
+async def backup(interaction: discord.Interaction):
+    if not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message(
+                "You don't have permission to use this command!",
+                ephemeral=True
+            )
+            return
+    with open("backup_data.json", "w") as f:
+        json.dump(
+            {user_id: list(handles) for user_id, handles in codeforces_account.items()},
+            f,
+            indent=4
+        )
+    with open("solved_problem_atcoder.json", "w") as f:
+        json.dump(
+            {user_id: list(problemId) for user_id, problemId in atcoder_solved_problem.items()},
+            f,
+            indent=4
+        )
+    await interaction.response.send_message("Backup finished")
+
+@bot.tree.command(
+    name="load_backup",
+    description="Load all backup data. Admin only"
+)
+async def load_backup(interaction: discord.Interaction):
+    global codeforces_account, atcoder_solved_problem
+    if not interaction.user.guild_permissions.administrator:
+        await interaction.response.send_message(
+            "You don't have permission to use this command!",
+            ephemeral=True
+        )
+        return
+    with open("backup_data.json", "r") as f:
+        raw_data = json.load(f)
+    codeforces_account = {
+        int(user_id): list(handles)
+        for user_id, handles in raw_data.items()
+    }
+    with open("solved_problem_atcoder.json", "r") as f:
+        raw_data = json.load(f)
+    atcoder_solved_problem = {
+        int(user_id): list(problemId)
+        for user_id, problemId in raw_data.items()
+    }
+    existed_account.clear()
+    for id, handle_list in codeforces_account.items():
+        for handle in handle_list:
+            existed_account.add(handle)
+
+    await interaction.response.send_message("Loaded all the data")
+
+#___________________________Run__________________________________________________
 bot.run(TOKEN)
