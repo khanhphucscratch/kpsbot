@@ -10,7 +10,7 @@ class CodeforcesProblem:
 
     @property
     def url(self):
-        return f"https://codeforces.com/problemset/problem/{self.contestId}/{self.index}"
+        return f"https://codeforces.com/contest/{self.contestId}/problems/{self.index}"
 
     def __str__(self):
         return f"{self.contestId}{self.index} - {self.name}"
