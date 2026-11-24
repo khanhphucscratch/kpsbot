@@ -5,7 +5,7 @@ Basically a bot that I decided to develop in my free time
 
 It's made just for randomize Codeforces problem
 
-New features (that I haven't see in any other bot):
+New features (that I haven't seen in any other bot):
  - can include many Codeforces handle for each users (useful for someone with many alt accounts like me hehe)
  - You could hide current problem rating (I do need this feature a lot)
  - You could say Hello to anyone! (I coded that just to test if my bot can connect with Discord properly, because I'm new to this. But I decided to keep that anyway)
