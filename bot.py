@@ -138,7 +138,7 @@ async def show_handle_list(interaction: discord.Interaction):
     user = interaction.user
     user_id = interaction.user.id
     if user_id not in codeforces_account:
-        codeforces_account[user_id] = []
+        codeforces_account[user_id] = set()
 
     msg = ""
     for handle in codeforces_account[user_id]:
@@ -168,7 +168,7 @@ async def train_getproblem(interaction: discord.Interaction, min_rating: int, ma
         return
 
     if codeforces_account.get(user_id) is None:
-        codeforces_account[user_id] = []
+        codeforces_account[user_id] = set()
     handle_list = codeforces_account[user_id]
     recommended_problem = await codeforces.recommend_problems_for_user(handle_list, min_rating = min_rating, max_rating = max_rating, minimum_id = minimum_id)
     if len(recommended_problem) == 0:
@@ -332,7 +332,7 @@ async def load_backup(interaction: discord.Interaction):
     with open(os.path.join("backup_data", "user_handle_list_codeforces.json"), "r") as f:
         raw_data = json.load(f)
     codeforces_account = {
-        int(user_id): list(handles)
+        int(user_id): set(handles)
         for user_id, handles in raw_data.items()
     }
     with open(os.path.join("backup_data", "solved_problem_atcoder.json"), "r") as f:
