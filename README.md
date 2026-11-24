@@ -1,4 +1,4 @@
-Dev note (current version: v2.1)
+Dev note (current version: v2.2)
 
 v1.0
 Basically a bot that I decided to develop in my free time
@@ -52,3 +52,5 @@ Edited features:
 /load_backup: Will load the backup automatically, I updated this to deal with new /backup features
 
 v2.1: Just organize backup data neatly inside a subfolder
+
+v2.2: Fixed some important security issues (that existed and noted from v1.0)

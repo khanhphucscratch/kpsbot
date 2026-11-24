@@ -22,6 +22,7 @@ bot = MyBot()
 codeforces_account = {}
 codeforces_verifying_account = {}
 existed_account = set()
+validating_account = {}
 current_training_status = {}
 
 @bot.tree.command(
@@ -34,6 +35,9 @@ async def say_hello(interaction: discord.Interaction, name: str):
 import json
 
 #Account manager
+expired_time = 60
+import asyncio
+account_lock = asyncio.Lock()
 import time
 import codeforces
 @bot.tree.command(
@@ -41,55 +45,71 @@ import codeforces
     description="Add a Codeforces handle"
 )
 async def add_handle(interaction: discord.Interaction, handle: str):
-    await interaction.response.defer()
-    user_id = interaction.user.id
-    if user_id not in codeforces_account:
-        codeforces_account[user_id] = set()
-    if len(codeforces_account[user_id]) >= 3:
-        await interaction.followup.send("No more than 3 accounts for each user")
-        return
-    if codeforces_verifying_account.get(user_id) is not None:
-        ltime = codeforces_verifying_account[user_id][1]
-        last_handle = codeforces_verifying_account[user_id][0]
-        existed_account.discard(last_handle)
-        if time.time() > ltime + 300:
-            codeforces_verifying_account.pop(user_id, None)
-            await interaction.followup.send("Verification expired. Try again.")
+    async with account_lock:
+        await interaction.response.defer()
+        user_id = interaction.user.id
+        if user_id not in codeforces_account:
+            codeforces_account[user_id] = set()
+        if len(codeforces_account[user_id]) >= 3:
+            await interaction.followup.send("No more than 3 accounts for each user")
             return
-        await interaction.followup.send("Be careful. You are verifying another account. This with nullify that process")
-    if handle in existed_account:
-        await interaction.followup.send("Registered handle / handle in the process of registration")
-        return
-    codeforces_verifying_account[user_id] = (handle, time.time())
-    existed_account.add(handle)
-    msg = f"{handle}, you have 5 minutes to submit a compile error to this problem: https://codeforces.com/problemset/problem/4/A \nAfter that, use /handle_verify to complete verifying your handle"
-    await interaction.followup.send(msg)
+        curtime = time.time()
+        if codeforces_verifying_account.get(user_id) is not None:
+            ltime = codeforces_verifying_account[user_id][1]
+            last_handle = codeforces_verifying_account[user_id][0]
+            codeforces_verifying_account.pop(user_id, None)
+            if validating_account.get(last_handle) == ltime:
+                validating_account.pop(last_handle, None)
+            if curtime > ltime + expired_time:
+                await interaction.followup.send("Last verification expired, verifying new account")
+            else:
+                await interaction.followup.send("Be careful. You are verifying another account. This with nullify that process")
+        if handle in existed_account:
+            await interaction.followup.send("Registered handle, please choose another handle")
+            return
+        if handle in validating_account and validating_account.get(handle) + expired_time > curtime:
+            await interaction.followup.send("This handle is being validated by someone else")
+            return
+
+        codeforces_verifying_account[user_id] = (handle, curtime)
+        validating_account[handle] = curtime
+        msg = f"{handle}, you have 5 minutes to submit a compile error to this problem: https://codeforces.com/problemset/problem/4/A \nAfter that, use /handle_verify to complete verifying your handle"
+        await interaction.followup.send(msg)
 
 @bot.tree.command(
     name="verify_handle",
     description="Verify a Codeforces handle"
 )
 async def verify_handle(interaction: discord.Interaction):
-    await interaction.response.defer()
+    async with account_lock:
+        await interaction.response.defer()
 
-    user = interaction.user
-    user_id = interaction.user.id
-    if codeforces_verifying_account.get(user_id) is None:
-        await interaction.followup.send("You are verifying no handle. Use /add_handle first")
-        return
-    handle, ltime = codeforces_verifying_account[user_id]
-    result = await codeforces.verifying_account(handle, ltime, ltime + 300)
-    if result == False:
-        await interaction.followup.send("Find no submission to verify " + handle)
-        return
+        user = interaction.user
+        user_id = interaction.user.id
+        if codeforces_verifying_account.get(user_id) is None:
+            await interaction.followup.send("You are verifying no handle. Use /add_handle first")
+            return
+        handle, ltime = codeforces_verifying_account[user_id]
+        if time.time() > ltime + expired_time:
+            codeforces_verifying_account.pop(user_id, None)
+            if validating_account.get(handle) == ltime:
+                validating_account.pop(handle, None)
+            await interaction.followup.send("Verification expired")
+            return
+        result = await codeforces.verifying_account(handle, ltime, ltime + expired_time)
+        if result == False:
+            await interaction.followup.send("Find no submission to verify " + handle)
+            return
 
-    if user_id not in codeforces_account:
-        codeforces_account[user_id] = set()
-    codeforces_account[user_id].add(handle)
-    codeforces_verifying_account[user_id] = None
+        if user_id not in codeforces_account:
+            codeforces_account[user_id] = set()
+        codeforces_account[user_id].add(handle)
+        codeforces_verifying_account[user_id] = None
+        existed_account.add(handle)
+        validating_account.pop(handle, None)
 
-    msg = "Sucessfully added handle " + handle + " to " + str(user)
-    await interaction.followup.send(msg)
+        msg = "Sucessfully added handle " + handle + " to " + str(user)
+        await interaction.followup.send(msg)
 
 
 @bot.tree.command(
