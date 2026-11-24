@@ -35,7 +35,7 @@ async def say_hello(interaction: discord.Interaction, name: str):
 import json
 
 #Account manager
-expired_time = 60
+expired_time = 300
 import asyncio
 account_lock = asyncio.Lock()
 import time
